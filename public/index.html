@@ -1,1 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Черновики TikTok — пакетная загрузка</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --border: #262b33;
+    --text: #e8eaed;
+    --muted: #8a919e;
+    --accent: #00f2ea; /* фирменный бирюзовый TikTok */
+    --accent2: #ff2d55; /* фирменный розовый TikTok */
+    --ok: #3ddc84;
+    --err: #ff5c5c;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .logo {
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+  }
+  #status-pill {
+    font-size: 12px;
+    font-family: var(--mono);
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  #status-pill.connected { color: var(--ok); border-color: rgba(61,220,132,0.3); }
 
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  p.sub { color: var(--muted); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+
+  .connect-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--text); color: #000;
+    border: none; padding: 12px 20px; border-radius: 10px;
+    font-weight: 700; font-size: 14px; cursor: pointer;
+    text-decoration: none;
+  }
+  .connect-btn:hover { opacity: 0.9; }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dropzone.drag { border-color: var(--accent); background: rgba(0,242,234,0.04); }
+  .dropzone strong { color: var(--text); }
+  input[type=file] { display: none; }
+
+  .file-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .file-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #0f1216; border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 8px; font-size: 13px;
+  }
+  .file-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+  .file-row .size { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .file-row .remove { color: var(--err); cursor: pointer; font-size: 16px; background: none; border: none; }
+  .file-row .badge {
+    font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .file-row .badge.ok { color: var(--ok); border-color: rgba(61,220,132,0.3); }
+  .file-row .badge.err { color: var(--err); border-color: rgba(255,92,92,0.3); }
+
+  .submit-btn {
+    width: 100%; margin-top: 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000; border: none; padding: 14px; border-radius: 10px;
+    font-weight: 800; font-size: 14px; cursor: pointer;
+  }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .note {
+    font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 14px;
+  }
+  .note a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="dot"></span>Draft Uploader</div>
+    <div id="status-pill">проверка…</div>
+  </header>
+
+  <div class="card" id="connect-card">
+    <h1>Подключи TikTok</h1>
+    <p class="sub">Один раз авторизуешь этот инструмент под своим аккаунтом — дальше токен обновляется автоматически.</p>
+    <a class="connect-btn" href="/auth/login">Войти через TikTok</a>
+  </div>
+
+  <div class="card">
+    <h1>Отправить в черновики</h1>
+    <p class="sub">Выбери несколько видео сразу — они по очереди уйдут в inbox твоего аккаунта. Дальше каждое нужно будет открыть в приложении TikTok и опубликовать вручную — так работает официальный режим черновиков.</p>
+
+    <div class="dropzone" id="dropzone">
+      <strong>Перетащи файлы сюда</strong><br>или нажми, чтобы выбрать
+      <input type="file" id="fileInput" accept="video/*" multiple>
+    </div>
+
+    <div class="file-list" id="fileList"></div>
+
+    <button class="submit-btn" id="submitBtn" disabled>Отправить в черновики</button>
+
+    <div class="note">
+      Между загрузками выдерживается пауза — TikTok ограничивает эту операцию 6 запросами в минуту на аккаунт. Это нормально, не признак ошибки.
+    </div>
+  </div>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const submitBtn = document.getElementById('submitBtn');
+const statusPill = document.getElementById('status-pill');
+let files = [];
+
+fetch('/auth/status').then(r => r.json()).then(d => {
+  statusPill.textContent = d.connected ? 'подключено' : 'не подключено';
+  statusPill.classList.toggle('connected', d.connected);
+});
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  addFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+function addFiles(fileListInput) {
+  for (const f of fileListInput) files.push(f);
+  renderFiles();
+}
+
+function formatSize(bytes) {
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1 ? mb.toFixed(1) + ' МБ' : (bytes / 1024).toFixed(0) + ' КБ';
+}
+
+function renderFiles() {
+  fileList.innerHTML = '';
+  files.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.dataset.index = i;
+    row.innerHTML = `
+      <span class="name">${f.name}</span>
+      <span class="size">${formatSize(f.size)}</span>
+      <button class="remove" onclick="removeFile(${i})">✕</button>
+    `;
+    fileList.appendChild(row);
+  });
+  submitBtn.disabled = files.length === 0;
+}
+
+function removeFile(i) {
+  files.splice(i, 1);
+  renderFiles();
+}
+
+submitBtn.addEventListener('click', async () => {
+  if (files.length === 0) return;
+  submitBtn.disabled = true;
+  submitBtn.textContent = `Отправка 0/${files.length}…`;
+
+  const formData = new FormData();
+  files.forEach(f => formData.append('videos', f));
+
+  try {
+    const resp = await fetch('/api/upload-batch', { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (resp.status === 401) {
+      alert('Сначала подключи TikTok через кнопку выше.');
+    } else {
+      renderResults(data.results || []);
+    }
+  } catch (err) {
+    alert('Ошибка сети: ' + err.message);
+  } finally {
+    submitBtn.textContent = 'Отправить в черновики';
+    submitBtn.disabled = false;
+  }
+});
+
+function renderResults(results) {
+  fileList.innerHTML = '';
+  results.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    const badgeClass = r.status === 'отправлено' ? 'ok' : 'err';
+    row.innerHTML = `
+      <span class="name">${r.file}</span>
+      <span class="badge ${badgeClass}">${r.status}</span>
+    `;
+    fileList.appendChild(row);
+  });
+  files = [];
+  submitBtn.disabled = true;
+}
+</script>
+</body>
+</html>
